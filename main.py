@@ -27,10 +27,12 @@ class SnakeGame(QWidget):
         # Размеры и задержка таймера
         self.GAME_DELAY = 100
         self.CELL_SIZE = 10
-        self.FIELD_SIZE_X = 50
-        self.FIELD_SIZE_Y = 50
+        self.FIELD_SIZE_X = 25
+        self.FIELD_SIZE_Y = 25
 
         # Поля с данными
+        self.WIN = 0
+        self.POINTS_TO_WIN = 5
         self.game_over = 0
         self.game_in_process = -1
         self.direction = ""
@@ -40,6 +42,63 @@ class SnakeGame(QWidget):
         self.snake_len = 0
         self.score = 0
         self.lives = 10
+        self.curr_level = 0
+
+        # Препятствия
+        self.borders = []
+
+        self.level_structures =\
+        [
+        [[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]],
+
+        [[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+         [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]]
+        ]
 
         # Инициализируем игру, запускаем таймер и отрисоввывем
         self.InitGame()
@@ -54,14 +113,25 @@ class SnakeGame(QWidget):
         self.snake_len = 1
         self.SpawnApple()
 
+        for i in range(len(self.level_structures[0])):
+            for j in range(len(self.level_structures[0][0])):
+                if self.level_structures[0][i][j] == 1:
+                    self.borders.append((j*self.CELL_SIZE, i*self.CELL_SIZE))
+
     # Спавн яблока
     def SpawnApple(self):
         self.apple = random.randint(self.CELL_SIZE, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(self.CELL_SIZE, (
                 self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
 
-        while self.AppleOnSnake():
+        while self.AppleOnSnake() or self.appleOnBord():
             self.apple = random.randint(0, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(0, (
                     self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
+
+    def appleOnBord(self):
+        for i in self.borders:
+            if i == self.apple:
+                return True
+        return False
 
     # Проверка нахождения яблока на змее
     def AppleOnSnake(self):
@@ -72,6 +142,12 @@ class SnakeGame(QWidget):
 
     # отрисовка
     def paintEvent(self, e):
+        if(self.WIN == 1):
+            qp = QPainter()
+            qp.begin(self)
+            qp.drawText(e.rect(), Qt.AlignCenter, "WIN")
+            qp.end()
+            return
         # TODO поменять кисти
         qp = QPainter()
         qp.begin(self)
@@ -89,6 +165,9 @@ class SnakeGame(QWidget):
         for i in range(1, self.snake_len):
             qp.drawRect(self.snake[ i ][ 0 ], self.snake[ i ][ 1 ], self.CELL_SIZE, self.CELL_SIZE)
 
+        for i in self.borders:
+            qp.drawRect(i[0], i[1], self.CELL_SIZE, self.CELL_SIZE)
+
         qp.end()
 
     # По таймеру двигаем змейку, проверяем яблоко и проверяем столкновения и самопересечения
@@ -97,6 +176,14 @@ class SnakeGame(QWidget):
             self.Move()
             self.CheckApple()
             self.game_over = self.CheckBorders()
+            if self.score == self.POINTS_TO_WIN*(self.curr_level+1):
+                self.game_over = 1
+                self.curr_level += 1
+            if self.curr_level == len(self.level_structures):
+                self.WIN = 1
+                self.repaint()
+                self.Pause()
+                return
             if (self.game_over != 0):
                 self.Restart()
                 self.game_over = 0
@@ -146,6 +233,9 @@ class SnakeGame(QWidget):
         for i in range(1, self.snake_len):
             if self.snake[ 0 ] == self.snake[ i ]:
                 return 1
+        for i in self.borders:
+            if self.snake[ 0 ] == i:
+                return 1
         return 0
 
     # Проверка столкновения с яблоком
@@ -169,6 +259,7 @@ class SnakeGame(QWidget):
 
     # Рестарт
     def Restart(self):
+        self.direction = ""
         self.lives -= 1
         self.lives_changed_signal.emit()
         if self.lives == 0:
@@ -179,6 +270,12 @@ class SnakeGame(QWidget):
             [ (self.FIELD_SIZE_X // 2) * self.CELL_SIZE, (self.FIELD_SIZE_Y // 2) * self.CELL_SIZE ])
         self.snake_len = 1
         self.SpawnApple()
+
+        self.borders.clear()
+        for i in range(len(self.level_structures[self.curr_level])):
+            for j in range(len(self.level_structures[self.curr_level][0])):
+                if self.level_structures[self.curr_level][i][j] == 1:
+                    self.borders.append((j*self.CELL_SIZE, i*self.CELL_SIZE))
 
     # Геттер размера поля
     def GetFieldSize(self):
