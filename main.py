@@ -15,13 +15,18 @@ class SnakeGame(QWidget):
     score_changed_signal = pyqtSignal()
     lives_changed_signal = pyqtSignal()
 
+    # конструктор
     def __init__(self, parent):
-
+        
+        # обращение к родительскому классу и вызов его конструктора
         super().__init__(parent)
-
+        
+        # теперь ЭТОТ виджет реагирует на нажатия на клавиатуру
         self.setFocus()
 
+        # размеры виджета
         self.resize(500, 500)
+        # отбражение виджета
         self.show()
 
         # Размеры и задержка таймера
@@ -35,6 +40,7 @@ class SnakeGame(QWidget):
         self.POINTS_TO_WIN = 5
         self.game_over = 0
         self.game_in_process = -1
+        # направление змейки
         self.direction = ""
         self.snake = [ ]  # тело змеи (первый элемент - голова)
         self.apple = (0, 0)
@@ -101,6 +107,7 @@ class SnakeGame(QWidget):
         ]
 
         # Инициализируем игру, запускаем таймер и отрисоввывем
+        # вызов метода
         self.InitGame()
         self.timer_id = self.startTimer(self.GAME_DELAY)
         self.repaint()
