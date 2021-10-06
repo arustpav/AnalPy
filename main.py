@@ -115,11 +115,13 @@ class SnakeGame(QWidget):
     # Спавним яблоко, создаём змейку, записываем длинну змейки
     def InitGame(self):
 
+        # помещаем змейку на поле
         self.snake.append(
             ((self.FIELD_SIZE_X // 2) * self.CELL_SIZE, (self.FIELD_SIZE_Y // 2) * self.CELL_SIZE))
         self.snake_len = 1
         self.SpawnApple()
 
+        # рассматриваем структуру уровня и добавляем границы в соответствии с ней
         for i in range(len(self.level_structures[0])):
             for j in range(len(self.level_structures[0][0])):
                 if self.level_structures[0][i][j] == 1:
@@ -130,10 +132,12 @@ class SnakeGame(QWidget):
         self.apple = random.randint(self.CELL_SIZE, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(self.CELL_SIZE, (
                 self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
 
+        # проверка на нормальный спавн 2 методами
         while self.AppleOnSnake() or self.appleOnBord():
             self.apple = random.randint(0, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(0, (
                     self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
 
+    # проверка на стену
     def appleOnBord(self):
         for i in self.borders:
             if i == self.apple:
@@ -159,19 +163,24 @@ class SnakeGame(QWidget):
         qp = QPainter()
         qp.begin(self)
 
+        # рисуем границы уровня
         qp.drawRect(0, 0, self.CELL_SIZE, self.CELL_SIZE * self.FIELD_SIZE_Y)
         qp.drawRect(0, 0, self.CELL_SIZE * self.FIELD_SIZE_X, self.CELL_SIZE)
         qp.drawRect(self.CELL_SIZE * self.FIELD_SIZE_X, 0, self.CELL_SIZE - 1, self.CELL_SIZE * self.FIELD_SIZE_Y - 1)
         qp.drawRect(0, self.CELL_SIZE * self.FIELD_SIZE_Y - self.CELL_SIZE, self.CELL_SIZE * self.FIELD_SIZE_X,
                     self.CELL_SIZE - 1)
 
+        # рисуем яблоко
         qp.drawEllipse(self.apple[ 0 ], self.apple[ 1 ], self.CELL_SIZE, self.CELL_SIZE)
 
+        # рисуем голову змейки
         qp.drawRect(self.snake[ 0 ][ 0 ], self.snake[ 0 ][ 1 ], self.CELL_SIZE, self.CELL_SIZE)
 
+        # рисуем тело змейки
         for i in range(1, self.snake_len):
             qp.drawRect(self.snake[ i ][ 0 ], self.snake[ i ][ 1 ], self.CELL_SIZE, self.CELL_SIZE)
 
+        # рисуем границы уровня
         for i in self.borders:
             qp.drawRect(i[0], i[1], self.CELL_SIZE, self.CELL_SIZE)
 
@@ -231,15 +240,18 @@ class SnakeGame(QWidget):
         if self.direction == "Right":
             self.snake[ 0 ] = self.snake[ 0 ][ 0 ] + self.CELL_SIZE, self.snake[ 0 ][ 1 ]
 
-    # Проверка столкновения с границами
+    # Проверка столкновения с шытом
     def CheckBorders(self):
+        # границы
         if self.snake[ 0 ][ 0 ] < self.CELL_SIZE or self.snake[ 0 ][ 1 ] < self.CELL_SIZE or self.snake[ 0 ][ 0 ] > (
                 self.FIELD_SIZE_X * self.CELL_SIZE - self.CELL_SIZE) or self.snake[ 0 ][ 1 ] > (
                 self.FIELD_SIZE_Y * self.CELL_SIZE - self.CELL_SIZE * 2):
             return 1
+        # змея
         for i in range(1, self.snake_len):
             if self.snake[ 0 ] == self.snake[ i ]:
                 return 1
+        # уровен
         for i in self.borders:
             if self.snake[ 0 ] == i:
                 return 1
