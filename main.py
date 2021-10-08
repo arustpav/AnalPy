@@ -1,12 +1,142 @@
-import sys, random, time
+import sys
+import random
+import time
 from PyQt5.QtWidgets import QWidget, QApplication, QPushButton, QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt
 from PyQt5 import QtGui, QtCore
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject, QRect
-import pyqtgraph as pg
-import numpy as np
+from typing import List, Union
+import json
+
+
+class Board:
+
+    def __init__(self, filename: str) -> None:
+        with open(filename, "r") as read_file:
+            _json = json.load(read_file)
+
+            # Препятствия
+            self.__borders = []
+
+            self.__wall = _json['wall']
+
+            self.__level_structures = _json['levels']
+
+        
+
+    def setLvl(self, level: int) -> None:
+        self.__borders = []
+        # рассматриваем структуру уровня и добавляем границы в соответствии с ней
+        for i in range(len(self.__level_structures[level])):
+            for j in range(len(self.__level_structures[level][0])):
+                if self.__level_structures[level][i][j] == 1:
+                    self.__borders.append((j, i))
+
+    def empty(self, position: Union[int, int]) -> bool:
+        if position[0] < self.__wall or position[0] > self.verticalLen() - 1 - self.__wall \
+                or position[1] < self.__wall or position[1] > self.verticalLen() - 1 - self.__wall:
+            return False
+        for i in self.__borders:
+            if i == position:
+                return False
+        return True
+
+    def verticalLen(self) -> int:
+        return len(self.__level_structures[0])
+
+    def horizontalLen(self) -> int:
+        return len(self.__level_structures[0][0])
+
+    def levelsCount(self) -> int:
+        return len(self.__level_structures)
+
+    def getBorders(self) -> List[int]:
+        return self.__borders
+
+    def wallSize(self) -> int:
+        return self.__wall
+
+
+class Snake:
+
+    def __init__(self) -> None:
+        self.__snake = []  # тело змеи (первый элемент - голова)
+        # фантомный хвост (место, где был хвост в прошлый ход)
+        self.__snake_tail = (0, 0)
+
+    # Проверка нахождения точки на змейке
+    def have(self, position: Union[int, int]) -> bool:
+        for i in self.__snake:
+            if i == position:
+                return True
+        return False
+
+    # Двигаем змейку
+    def move(self, direction: str) -> None:
+        self.__snake_tail = self.__snake[-1]
+
+        for i in range(len(self.__snake) - 1, 0, -1):
+            self.__snake[i] = self.__snake[i - 1]
+
+        if direction == "Up":
+            self.__snake[0] = self.__snake[0][0], self.__snake[0][1] - 1
+
+        if direction == "Down":
+            self.__snake[0] = self.__snake[0][0], self.__snake[0][1] + 1
+
+        if direction == "Left":
+            self.__snake[0] = self.__snake[0][0] - 1, self.__snake[0][1]
+
+        if direction == "Right":
+            self.__snake[0] = self.__snake[0][0] + 1, self.__snake[0][1]
+
+    def incLen(self) -> None:
+        self.__snake.append(self.__snake_tail)
+
+    def spawn(self, position: Union[int, int]) -> None:
+        self.__snake = [position]
+        self.__snake_tail = position
+
+    def checkApple(self, position: Union[int, int]) -> None:
+        return self.__snake[0] == position
+
+    def isCorrect(self, board: Board) -> bool:
+        # границы
+        if self.__snake[0][0] < board.wallSize() or self.__snake[0][1] < board.wallSize() \
+                or self.__snake[0][0] > board.verticalLen() - board.wallSize() or self.__snake[0][1] > board.horizontalLen() - board.wallSize():
+            return False
+        # пересечение змеи и песечение уровня
+        for i in range(1, len(self.__snake)):
+            if self.__snake[0] == self.__snake[i]:
+                return False
+            if not board.empty(self.__snake[i]):
+                return False
+        if not board.empty(self.__snake[0]):
+            return False
+        return True
+
+    def getSnakeArray(self) -> List[int]:
+        return self.__snake
+
+
+class Apple:
+
+    def __init__(self) -> None:
+        self.__position = (0, 0)
+
+    def spawn(self, board: Board, snake: Snake) -> None:
+        self.__position = random.randint(0, board.verticalLen() - 1), \
+            random.randint(0, board.horizontalLen() - 1)
+
+        # проверка на нормальный спавн 2 методами
+        while (not board.empty(self.__position)) or snake.have(self.__position):
+            self.__position = random.randint(0, board.verticalLen() - 1), \
+                random.randint(0, board.horizontalLen() - 1)
+
+    def getPosition(self) -> Union[int, int]:
+        return self.__position
 
 
 # Виджет самой игры змейки
@@ -16,11 +146,11 @@ class SnakeGame(QWidget):
     lives_changed_signal = pyqtSignal()
 
     # конструктор
-    def __init__(self, parent):
-        
+    def __init__(self, parent, board: Board, snake: Snake, apple: Apple):
+
         # обращение к родительскому классу и вызов его конструктора
         super().__init__(parent)
-        
+
         # теперь ЭТОТ виджет реагирует на нажатия на клавиатуру
         self.setFocus()
 
@@ -29,11 +159,13 @@ class SnakeGame(QWidget):
         # отбражение виджета
         self.show()
 
+        self.apple = apple
+        self.snake = snake
+        self.board = board
+        self.CELL_SIZE = 20
+
         # Размеры и задержка таймера
-        self.GAME_DELAY = 100
-        self.CELL_SIZE = 10
-        self.FIELD_SIZE_X = 25
-        self.FIELD_SIZE_Y = 25
+        self.GAME_DELAY = 150
 
         # Поля с данными
         self.WIN = 0
@@ -42,69 +174,9 @@ class SnakeGame(QWidget):
         self.game_in_process = -1
         # направление змейки
         self.direction = ""
-        self.snake = [ ]  # тело змеи (первый элемент - голова)
-        self.apple = (0, 0)
-        self.snake_tail = (0, 0)  # фантомный хвост (место, где был хвост в прошлый ход)
-        self.snake_len = 0
         self.score = 0
         self.lives = 10
         self.curr_level = 0
-
-        # Препятствия
-        self.borders = []
-
-        self.level_structures =\
-        [
-        [[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]],
-
-        [[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-         [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]]
-        ]
 
         # Инициализируем игру, запускаем таймер и отрисоввывем
         # вызов метода
@@ -116,40 +188,12 @@ class SnakeGame(QWidget):
     def InitGame(self):
 
         # помещаем змейку на поле
-        self.snake.append(
-            ((self.FIELD_SIZE_X // 2) * self.CELL_SIZE, (self.FIELD_SIZE_Y // 2) * self.CELL_SIZE))
-        self.snake_len = 1
-        self.SpawnApple()
+        self.snake.spawn(
+            ((self.board.verticalLen() // 2), (self.board.horizontalLen() // 2))
+        )
+        self.apple.spawn(self.board, self.snake)
 
-        # рассматриваем структуру уровня и добавляем границы в соответствии с ней
-        for i in range(len(self.level_structures[0])):
-            for j in range(len(self.level_structures[0][0])):
-                if self.level_structures[0][i][j] == 1:
-                    self.borders.append((j*self.CELL_SIZE, i*self.CELL_SIZE))
-
-    # Спавн яблока
-    def SpawnApple(self):
-        self.apple = random.randint(self.CELL_SIZE, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(self.CELL_SIZE, (
-                self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
-
-        # проверка на нормальный спавн 2 методами
-        while self.AppleOnSnake() or self.appleOnBord():
-            self.apple = random.randint(0, (self.FIELD_SIZE_X - 1)) * self.CELL_SIZE, random.randint(0, (
-                    self.FIELD_SIZE_Y - 2)) * self.CELL_SIZE
-
-    # проверка на стену
-    def appleOnBord(self):
-        for i in self.borders:
-            if i == self.apple:
-                return True
-        return False
-
-    # Проверка нахождения яблока на змее
-    def AppleOnSnake(self):
-        for i in self.snake:
-            if i == self.apple:
-                return True
-        return False
+        self.board.setLvl(0)
 
     # отрисовка
     def paintEvent(self, e):
@@ -164,38 +208,50 @@ class SnakeGame(QWidget):
         qp.begin(self)
 
         # рисуем границы уровня
-        qp.drawRect(0, 0, self.CELL_SIZE, self.CELL_SIZE * self.FIELD_SIZE_Y)
-        qp.drawRect(0, 0, self.CELL_SIZE * self.FIELD_SIZE_X, self.CELL_SIZE)
-        qp.drawRect(self.CELL_SIZE * self.FIELD_SIZE_X, 0, self.CELL_SIZE - 1, self.CELL_SIZE * self.FIELD_SIZE_Y - 1)
-        qp.drawRect(0, self.CELL_SIZE * self.FIELD_SIZE_Y - self.CELL_SIZE, self.CELL_SIZE * self.FIELD_SIZE_X,
+        qp.drawRect(0, 0, self.CELL_SIZE, self.CELL_SIZE *
+                    self.board.horizontalLen())
+        qp.drawRect(0, 0, self.CELL_SIZE *
+                    self.board.verticalLen(), self.CELL_SIZE)
+        qp.drawRect(self.CELL_SIZE * self.board.verticalLen(), 0,
+                    self.CELL_SIZE - 1, self.CELL_SIZE * self.board.horizontalLen() - 1)
+        qp.drawRect(0, self.CELL_SIZE * self.board.horizontalLen() - self.CELL_SIZE, self.CELL_SIZE * self.board.verticalLen(),
                     self.CELL_SIZE - 1)
 
+        apple = self.apple.getPosition()
+
         # рисуем яблоко
-        qp.drawEllipse(self.apple[ 0 ], self.apple[ 1 ], self.CELL_SIZE, self.CELL_SIZE)
+        qp.drawEllipse(apple[0] * self.CELL_SIZE,
+                       apple[1] * self.CELL_SIZE,
+                       self.CELL_SIZE, self.CELL_SIZE)
+
+        snake = self.snake.getSnakeArray()
 
         # рисуем голову змейки
-        qp.drawRect(self.snake[ 0 ][ 0 ], self.snake[ 0 ][ 1 ], self.CELL_SIZE, self.CELL_SIZE)
+        qp.drawRect(snake[0][0] * self.CELL_SIZE, snake[0][1]
+                    * self.CELL_SIZE, self.CELL_SIZE, self.CELL_SIZE)
 
         # рисуем тело змейки
-        for i in range(1, self.snake_len):
-            qp.drawRect(self.snake[ i ][ 0 ], self.snake[ i ][ 1 ], self.CELL_SIZE, self.CELL_SIZE)
+        for i in range(1, len(snake)):
+            qp.drawRect(snake[i][0] * self.CELL_SIZE, snake[i][1]
+                        * self.CELL_SIZE, self.CELL_SIZE, self.CELL_SIZE)
 
         # рисуем границы уровня
-        for i in self.borders:
-            qp.drawRect(i[0], i[1], self.CELL_SIZE, self.CELL_SIZE)
+        for i in self.board.getBorders():
+            qp.drawRect(i[0] * self.CELL_SIZE, i[1] *
+                        self.CELL_SIZE, self.CELL_SIZE, self.CELL_SIZE)
 
         qp.end()
 
     # По таймеру двигаем змейку, проверяем яблоко и проверяем столкновения и самопересечения
     def timerEvent(self, e):
         if (self.game_in_process == 1):
-            self.Move()
+            self.snake.move(self.direction)
             self.CheckApple()
-            self.game_over = self.CheckBorders()
+            self.game_over = not self.snake.isCorrect(self.board)
             if self.score == self.POINTS_TO_WIN*(self.curr_level+1):
                 self.game_over = 1
                 self.curr_level += 1
-            if self.curr_level == len(self.level_structures):
+            if self.curr_level == self.board.levelsCount():
                 self.WIN = 1
                 self.repaint()
                 self.Pause()
@@ -221,50 +277,12 @@ class SnakeGame(QWidget):
             self.direction = "Down"
         # QWidget.keyPressEvent(e);
 
-    # Двигаем змейку
-    def Move(self):
-        self.snake_tail = self.snake[ self.snake_len - 1 ]
-
-        for i in range(self.snake_len - 1, 0, -1):
-            self.snake[ i ] = self.snake[ i - 1 ]
-
-        if self.direction == "Up":
-            self.snake[ 0 ] = self.snake[ 0 ][ 0 ], self.snake[ 0 ][ 1 ] - self.CELL_SIZE
-
-        if self.direction == "Down":
-            self.snake[ 0 ] = self.snake[ 0 ][ 0 ], self.snake[ 0 ][ 1 ] + self.CELL_SIZE
-
-        if self.direction == "Left":
-            self.snake[ 0 ] = self.snake[ 0 ][ 0 ] - self.CELL_SIZE, self.snake[ 0 ][ 1 ]
-
-        if self.direction == "Right":
-            self.snake[ 0 ] = self.snake[ 0 ][ 0 ] + self.CELL_SIZE, self.snake[ 0 ][ 1 ]
-
-    # Проверка столкновения с шытом
-    def CheckBorders(self):
-        # границы
-        if self.snake[ 0 ][ 0 ] < self.CELL_SIZE or self.snake[ 0 ][ 1 ] < self.CELL_SIZE or self.snake[ 0 ][ 0 ] > (
-                self.FIELD_SIZE_X * self.CELL_SIZE - self.CELL_SIZE) or self.snake[ 0 ][ 1 ] > (
-                self.FIELD_SIZE_Y * self.CELL_SIZE - self.CELL_SIZE * 2):
-            return 1
-        # змея
-        for i in range(1, self.snake_len):
-            if self.snake[ 0 ] == self.snake[ i ]:
-                return 1
-        # уровен
-        for i in self.borders:
-            if self.snake[ 0 ] == i:
-                return 1
-        return 0
-
     # Проверка столкновения с яблоком
     def CheckApple(self):
-        if self.snake[ 0 ] == self.apple:
-            self.SpawnApple()
-            self.snake_len += 1
+        if self.snake.checkApple(self.apple.getPosition()):
+            self.apple.spawn(self.board, self.snake)
+            self.snake.incLen()
             self.score += 1
-            self.snake.append((0, 0))
-            self.snake[ self.snake_len - 1 ] = self.snake_tail
             self.score_changed_signal.emit()
 
     # Пауза
@@ -284,21 +302,15 @@ class SnakeGame(QWidget):
         if self.lives == 0:
             self.game_in_process = 0
             self.repaint()
-        self.snake.clear()
-        self.snake.append(
-            [ (self.FIELD_SIZE_X // 2) * self.CELL_SIZE, (self.FIELD_SIZE_Y // 2) * self.CELL_SIZE ])
-        self.snake_len = 1
-        self.SpawnApple()
+        self.snake.spawn(
+            [(self.board.verticalLen() // 2), (self.board.horizontalLen() // 2)])
+        self.apple.spawn(self.board, self.snake)
 
-        self.borders.clear()
-        for i in range(len(self.level_structures[self.curr_level])):
-            for j in range(len(self.level_structures[self.curr_level][0])):
-                if self.level_structures[self.curr_level][i][j] == 1:
-                    self.borders.append((j*self.CELL_SIZE, i*self.CELL_SIZE))
+        self.board.setLvl(self.curr_level)
 
     # Геттер размера поля
     def GetFieldSize(self):
-        return [ self.FIELD_SIZE_X, self.FIELD_SIZE_Y ]
+        return [self.board.verticalLen(), self.board.horizontalLen()]
 
     # Гетер размера клетки
     def GetCellSize(self):
@@ -306,17 +318,19 @@ class SnakeGame(QWidget):
 
 
 class Menu(QWidget):
-    def __init__(self):
+    def __init__(self, levelsFilename):
         super().__init__()
 
-        #Слева сама змейка, справа в vbox кнопки и очки
+        # Слева сама змейка, справа в vbox кнопки и очки
 
-        self.snake_game_widg = SnakeGame(self)
+        self.snake_game_widg = SnakeGame(
+            self, Board(levelsFilename), Snake(), Apple())
 
         menu_size = 100
         xsz = self.snake_game_widg.GetFieldSize()[
-                  0 ] * self.snake_game_widg.GetCellSize() + menu_size + self.snake_game_widg.GetCellSize()
-        ysz = self.snake_game_widg.GetFieldSize()[ 1 ] * self.snake_game_widg.GetCellSize()
+            0] * self.snake_game_widg.GetCellSize() + menu_size + self.snake_game_widg.GetCellSize()
+        ysz = self.snake_game_widg.GetFieldSize(
+        )[1] * self.snake_game_widg.GetCellSize()
 
         self.resize(xsz, ysz)
 
@@ -347,12 +361,12 @@ class Menu(QWidget):
 
         self.show()
 
-    #Слот под установку очков
+    # Слот под установку очков
     def SetScore(self):
         text = "Score: " + str(self.snake_game_widg.score)
         self.score.setText(text)
 
-    #Слот под установку жизней
+    # Слот под установку жизней
     def SetLives(self):
         text = "Lives: " + str(self.snake_game_widg.lives)
         self.lives.setText(text)
@@ -360,5 +374,5 @@ class Menu(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = Menu()
+    ex = Menu(sys.argv[1])
     sys.exit(app.exec_())
