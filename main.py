@@ -10,7 +10,6 @@ from PyQt5.QtCore import pyqtSignal, QObject, QRect
 from typing import List, Union
 import json
 
-
 class Board:
 
     def __init__(self, filename: str) -> None:
@@ -351,10 +350,10 @@ class Menu(QWidget):
         vbox.addWidget(self.pause_button)
         vbox.addWidget(self.quit_button)
 
-        # TODO Подключить сигналы к лейблам
+        
         self.snake_game_widg.lives_changed_signal.connect(self.SetLives)
         self.snake_game_widg.score_changed_signal.connect(self.SetScore)
-        # TODO Подключить сигналы к лейблам
+       
 
         vbox.setGeometry(QRect(xsz - menu_size, 0, menu_size, ysz))
         self.snake_game_widg.setGeometry(0, 0, xsz - menu_size, ysz)
