@@ -190,10 +190,9 @@ class SnakeGame(QWidget):
         self.snake.spawn(
             ((self.board.verticalLen() // 2), (self.board.horizontalLen() // 2))
         )
-        self.apple.spawn(self.board, self.snake)
-
         self.board.setLvl(0)
 
+        self.apple.spawn(self.board, self.snake)
     # отрисовка
     def paintEvent(self, e):
         if(self.WIN == 1):
